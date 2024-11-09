@@ -18,13 +18,23 @@ def stok_ekle(urun_kodu, urun_adi, miktar, yeniden_siparis_siniri):
                                  columns=["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"])
         st.session_state.stok_df = pd.concat([st.session_state.stok_df, yeni_veri], ignore_index=True)
 
-def stok_guncelle(urun_kodu, eski_miktar, yeni_miktar):
+def stok_guncelle(urun_kodu, miktar_degisim):
     if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values:
-        stok_farki = eski_miktar - yeni_miktar  # Eski ve yeni miktar farkı
-        st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'] += stok_farki
-        return f"{urun_kodu} ürününün stok durumu güncellendi."
+        st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'] -= miktar_degisim
     else:
-        return "Bu ürün stokta bulunmuyor."
+        st.warning("Stok güncellenemedi, ürün bulunamadı.")
+
+def siparis_ekle(siparis_adi, urun_kodu, miktar):
+    if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values:
+        urun_adi = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Ürün Adı'].values[0]
+        yeni_siparis = pd.DataFrame([[siparis_adi, urun_kodu, urun_adi, miktar, pd.to_datetime('today')]], columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar", "Tarih"])
+        st.session_state.siparisler_df = pd.concat([st.session_state.siparisler_df, yeni_siparis], ignore_index=True)
+        
+        # Stok güncellemesi
+        stok_guncelle(urun_kodu, miktar)  # Sipariş miktarı stoktan düşülür
+        st.success(f"{urun_kodu} stoktan {miktar} düşülerek güncellendi.")
+    else:
+        st.error(f"{urun_kodu} ürün kodu stokta bulunamadı, sipariş eklenemedi.")
 
 def siparis_ekle(siparis_adi, urun_kodu, miktar):
     urun_adi = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Ürün Adı'].values[0] if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values else "Bilinmiyor"
