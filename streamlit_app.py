@@ -17,14 +17,11 @@ def stok_ekle(urun_kodu, urun_adi, miktar, yeniden_siparis_siniri):
                                  columns=["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"])
         st.session_state.stok_df = pd.concat([st.session_state.stok_df, yeni_veri], ignore_index=True)
 
-def stok_guncelle(urun_kodu, siparis_miktari):
+def stok_guncelle(urun_kodu, eski_miktar, yeni_miktar):
     if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values:
-        mevcut_stok = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'].values[0]
-        if mevcut_stok >= siparis_miktari:
-            st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'] -= siparis_miktari
-            return f"{urun_kodu} ürününden {siparis_miktari} adet düşüldü."
-        else:
-            return f"{urun_kodu} ürünü için yeterli stok bulunmuyor."
+        stok_farki = eski_miktar - yeni_miktar  # Eski ve yeni miktar farkı
+        st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'] += stok_farki
+        return f"{urun_kodu} ürününün stok durumu güncellendi."
     else:
         return "Bu ürün stokta bulunmuyor."
 
@@ -82,8 +79,7 @@ with tab3:
 
         for k, m in zip(urun_kodlari, miktarlar):
             siparis_ekle(siparis_adi, k.strip(), m)
-            sonuc = stok_guncelle(k.strip(), m)
-            st.write(sonuc)
+            stok_guncelle(k.strip(), 0, m)  # İlk sipariş eklemede eski miktar 0 olarak alınır.
         
         st.success("Sipariş eklendi ve stoklar güncellendi.")
 
@@ -99,13 +95,13 @@ with tab4:
 
             # Sipariş Düzenleme
             urun_secimi = st.selectbox("Düzenlenecek Ürün", siparis_detay['Ürün Kodu'])
-            yeni_miktar = st.number_input("Yeni Miktar", min_value=0)
+            mevcut_miktar = siparis_detay[siparis_detay['Ürün Kodu'] == urun_secimi]['Miktar'].values[0]
+            yeni_miktar = st.number_input("Yeni Miktar", min_value=0, value=mevcut_miktar)
+            
             if st.button(f"{urun_secimi} Ürününü Güncelle"):
                 st.session_state.siparisler_df.loc[(st.session_state.siparisler_df['Sipariş Adı'] == siparis_adi) &
                                                    (st.session_state.siparisler_df['Ürün Kodu'] == urun_secimi), 'Miktar'] = yeni_miktar
-                st.success(f"{urun_secimi} ürününün miktarı güncellendi.")
                 
-                # Stok miktarını da güncelle
-                mevcut_miktar = siparis_detay[siparis_detay['Ürün Kodu'] == urun_secimi]['Miktar'].values[0]
-                stok_guncelle(urun_secimi, mevcut_miktar - yeni_miktar)
-                st.info("Stok durumu güncellendi.")
+                # Stok miktarını eski ve yeni miktar farkına göre güncelle
+                stok_guncelle(urun_secimi, mevcut_miktar, yeni_miktar)
+                st.success(f"{urun_secimi} ürününün miktarı güncellendi ve stok durumu canlı tutuldu.")
