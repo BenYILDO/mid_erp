@@ -144,32 +144,10 @@ with tab5:
     # En çok satılan ürünler
     top_selling_products = {}
     for i, urun_kodu in enumerate(st.session_state.siparisler_df['Ürün Kodu']):
-        if urun_kodu in top_selling_products:
-            top_selling_products[urun_kodu] += st.session_state.siparisler_df['Miktar'][i]
-        else:
-            top_selling_products[urun_kodu] = st.session_state.siparisler_df['Miktar'][i]
-
-    # En çok satılan ürünleri sıralama
-    sorted_top_selling = sorted(top_selling_products.items(), key=lambda x: x[1], reverse=True)
+        if urun_kodu not in top_selling_products:
+            top_selling_products[urun_kodu] = 0
+        top_selling_products[urun_kodu] += st.session_state.siparisler_df['Miktar'][i]
     
-    # Veriyi dataframe olarak gösterme
-    top_selling_df = pd.DataFrame(sorted_top_selling, columns=["Ürün Kodu", "Satılan Miktar"])
-    st.write(top_selling_df)
-    
-    # En çok satılan ürünler grafiği
-    if not top_selling_df.empty:
-        chart = alt.Chart(top_selling_df).mark_bar().encode(
-            x='Ürün Kodu',
-            y='Satılan Miktar',
-            color='Ürün Kodu'
-        ).properties(title="En Çok Satılan Ürünler")
-
-        st.altair_chart(chart, use_container_width=True)
-    
-    # Düşük stok uyarılarını görselleştirme
-    eksik_stok_df = [stok for stok in zip(st.session_state.stok_df['Ürün Kodu'], st.session_state.stok_df['Stok Miktarı'], st.session_state.stok_df['Yeniden Sipariş Sınırı']) if stok[1] < stok[2]]
-    if eksik_stok_df:
-        st.warning("Düşük stok seviyesindeki ürünler:")
-        st.write(eksik_stok_df)
-    else:
-        st.success("Tüm stoklar yeterli seviyede.")
+    # Analiz için en fazla sipariş verilen ürünler
+    sorted_products = sorted(top_selling_products.items(), key=lambda x: x[1], reverse=True)
+    st.write("En Çok Satılan Ürünler:", sorted_products)
