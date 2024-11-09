@@ -41,6 +41,8 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Stok Yönetimi", "Güncel Stok Durumu",
 with tab1:
     st.header("Stok Yönetimi")
 
+    st.button("Upload and Update Data", on_click=upload_and_update_data)
+
     # Stok Ekleme
     with st.expander("Stok Ekle"):
         urun_adi = st.text_input("Ürün Adı")
