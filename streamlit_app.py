@@ -82,7 +82,8 @@ with tab3:
 
         for k, m in zip(urun_kodlari, miktarlar):
             siparis_ekle(siparis_adi, k.strip(), m)
-            stok_guncelle(k.strip(), m)
+            sonuc = stok_guncelle(k.strip(), m)
+            st.write(sonuc)
         
         st.success("Sipariş eklendi ve stoklar güncellendi.")
 
