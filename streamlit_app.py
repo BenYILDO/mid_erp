@@ -28,7 +28,8 @@ def stok_guncelle(urun_kodu, siparis_miktari):
     else:
         return "Bu ürün stokta bulunmuyor."
 
-def siparis_ekle(siparis_adi, urun_kodu, urun_adi, miktar):
+def siparis_ekle(siparis_adi, urun_kodu, miktar):
+    urun_adi = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Ürün Adı'].values[0] if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values else "Bilinmiyor"
     yeni_siparis = pd.DataFrame([[siparis_adi, urun_kodu, urun_adi, miktar]], columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar"])
     st.session_state.siparisler_df = pd.concat([st.session_state.siparisler_df, yeni_siparis], ignore_index=True)
 
@@ -73,16 +74,14 @@ with tab3:
     # Sipariş bilgileri girişi
     siparis_adi = st.text_input("Sipariş Adı")
     urun_kodu = st.text_input("Ürün Kodu (Virgülle ayırarak birden fazla ürün ekleyebilirsiniz)")
-    urun_adi = st.text_input("Ürün Adı (Virgülle ayırarak ürün adlarını girin)")
     miktar = st.text_input("Miktar (Virgülle ayırarak sırasıyla miktarları girin)")
 
     if st.button("Siparişi Kaydet"):
         urun_kodlari = urun_kodu.split(',')
-        urun_adlari = urun_adi.split(',')
         miktarlar = [int(m) for m in miktar.split(',')]
 
-        for k, a, m in zip(urun_kodlari, urun_adlari, miktarlar):
-            siparis_ekle(siparis_adi, k.strip(), a.strip(), m)
+        for k, m in zip(urun_kodlari, miktarlar):
+            siparis_ekle(siparis_adi, k.strip(), m)
             stok_guncelle(k.strip(), m)
         
         st.success("Sipariş eklendi ve stoklar güncellendi.")
