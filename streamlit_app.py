@@ -7,7 +7,7 @@ if 'stok_df' not in st.session_state:
     st.session_state.stok_df = pd.DataFrame(columns=["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"])
 
 if 'siparisler_df' not in st.session_state:
-    st.session_state.siparisler_df = pd.DataFrame(columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar"])
+    st.session_state.siparisler_df = pd.DataFrame(columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar", "Tarih"])
 
 # Fonksiyonlar
 def stok_ekle(urun_kodu, urun_adi, miktar, yeniden_siparis_siniri):
@@ -28,14 +28,14 @@ def stok_guncelle(urun_kodu, eski_miktar, yeni_miktar):
 
 def siparis_ekle(siparis_adi, urun_kodu, miktar):
     urun_adi = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Ürün Adı'].values[0] if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values else "Bilinmiyor"
-    yeni_siparis = pd.DataFrame([[siparis_adi, urun_kodu, urun_adi, miktar]], columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar"])
+    yeni_siparis = pd.DataFrame([[siparis_adi, urun_kodu, urun_adi, miktar, pd.to_datetime('today')]], columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar", "Tarih"])
     st.session_state.siparisler_df = pd.concat([st.session_state.siparisler_df, yeni_siparis], ignore_index=True)
 
 # Uygulama Başlığı
 st.title("Gelişmiş ERP Stok ve Sipariş Yönetimi")
 
 # Sekmeler
-tab1, tab2, tab3, tab4 = st.tabs(["Stok Yönetimi", "Güncel Stok Durumu", "Sipariş Ekle", "Siparişler Ekranı"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Stok Yönetimi", "Güncel Stok Durumu", "Sipariş Ekle", "Siparişler Ekranı", "Raporlama ve Analiz"])
 
 # Stok Yönetimi Sekmesi
 with tab1:
@@ -120,3 +120,92 @@ with tab4:
                 # Stok miktarını eski ve yeni miktar farkına göre güncelle
                 stok_guncelle(urun_secimi, mevcut_miktar, yeni_miktar)
                 st.success(f"{urun_secimi} ürününün miktarı güncellendi ve stok durumu canlı tutuldu.")
+
+# Raporlama ve Analiz Sekmesi
+with tab5:
+    st.header("Raporlama ve Analiz")
+    
+    # En çok satılan ürünler
+    top_selling_products = st.session_state.siparisler_df.groupby('Ürün Kodu')['Miktar'].sum().reset_index()
+    top_selling_products = top_selling_products.sort_values(by='Miktar', ascending=False)
+    
+    st.subheader("En Çok Satılan Ürünler")
+    top_selling_chart = alt.Chart(top_selling_products).mark_bar().encode(
+        x='Ürün Kodu',
+        y='Miktar',
+        color='Ürün Kodu'
+    ).properties(title="En Çok Satılan Ürünler")
+    st.altair_chart(top_selling_chart, use_container_width=True)
+
+        # Günlük/Haftalık Sipariş Hareketi
+    st.subheader("Günlük ve Haftalık Sipariş Hareketi")
+
+    # Sipariş tarihine göre sıralama
+    if not st.session_state.siparisler_df.empty:
+        # Günlük ve haftalık analiz için 'Tarih' sütununu kullanıyoruz
+        siparisler_df = st.session_state.siparisler_df.copy()
+        siparisler_df['Tarih'] = pd.to_datetime(siparisler_df['Tarih'])
+
+        # Günlük sipariş verisi
+        daily_sales = siparisler_df.groupby(siparisler_df['Tarih'].dt.date)['Miktar'].sum().reset_index()
+        daily_sales.columns = ['Tarih', 'Toplam Miktar']
+
+        # Haftalık sipariş verisi
+        weekly_sales = siparisler_df.groupby(siparisler_df['Tarih'].dt.to_period('W'))['Miktar'].sum().reset_index()
+        weekly_sales.columns = ['Tarih', 'Toplam Miktar']
+
+        # Altair ile grafikler
+        daily_sales_chart = alt.Chart(daily_sales).mark_line().encode(
+            x='Tarih:T',
+            y='Toplam Miktar:Q',
+            color=alt.value('blue')
+        ).properties(title="Günlük Sipariş Hareketi")
+
+        weekly_sales_chart = alt.Chart(weekly_sales).mark_line().encode(
+            x='Tarih:T',
+            y='Toplam Miktar:Q',
+            color=alt.value('orange')
+        ).properties(title="Haftalık Sipariş Hareketi")
+
+        st.altair_chart(daily_sales_chart, use_container_width=True)
+        st.altair_chart(weekly_sales_chart, use_container_width=True)
+    else:
+        st.warning("Henüz sipariş verisi bulunmamaktadır.")
+
+    # Düşük Stok Uyarı Raporu
+    st.subheader("Düşük Stok Uyarıları")
+
+    # Düşük stok seviyesindeki ürünlerin raporlanması
+    eksik_stok_df = st.session_state.stok_df[st.session_state.stok_df['Stok Miktarı'] < st.session_state.stok_df['Yeniden Sipariş Sınırı']]
+    
+    if not eksik_stok_df.empty:
+        st.write("Düşük stok seviyesindeki ürünler:")
+        st.write(eksik_stok_df[['Ürün Kodu', 'Ürün Adı', 'Stok Miktarı', 'Yeniden Sipariş Sınırı']])
+    else:
+        st.success("Tüm ürünler yeterli stok seviyesinde.")
+
+    # Sipariş ve stok analizi
+    st.subheader("Ürün Bazlı Sipariş ve Stok Analizi")
+
+    if not st.session_state.stok_df.empty and not st.session_state.siparisler_df.empty:
+        # Ürün bazında stok ve sipariş bilgilerini birleştirme
+        stok_siparis_df = pd.merge(st.session_state.stok_df, st.session_state.siparisler_df.groupby('Ürün Kodu')['Miktar'].sum().reset_index(), on='Ürün Kodu', how='left')
+        stok_siparis_df['Miktar'] = stok_siparis_df['Miktar'].fillna(0)  # Eğer sipariş yoksa 0 olarak al
+
+        stok_siparis_df['Kalan Stok'] = stok_siparis_df['Stok Miktarı'] - stok_siparis_df['Miktar']
+
+        # Ürün bazında raporlama
+        st.write(stok_siparis_df[['Ürün Kodu', 'Ürün Adı', 'Stok Miktarı', 'Miktar', 'Kalan Stok']])
+
+        # Altair ile stok ve sipariş analizi grafiği
+        product_analysis_chart = alt.Chart(stok_siparis_df).mark_bar().encode(
+            x='Ürün Adı',
+            y='Stok Miktarı',
+            color='Ürün Kodu',
+            tooltip=['Ürün Adı', 'Stok Miktarı', 'Miktar', 'Kalan Stok']
+        ).properties(title="Ürün Bazlı Stok ve Sipariş Analizi")
+
+        st.altair_chart(product_analysis_chart, use_container_width=True)
+
+    else:
+        st.warning("Stok veya sipariş verisi eksik.")
