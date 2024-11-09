@@ -137,75 +137,50 @@ with tab5:
     ).properties(title="En Çok Satılan Ürünler")
     st.altair_chart(top_selling_chart, use_container_width=True)
 
-        # Günlük/Haftalık Sipariş Hareketi
-    st.subheader("Günlük ve Haftalık Sipariş Hareketi")
+    # Günlük/Haftalık Sipariş Hareketi
+st.subheader("Günlük ve Haftalık Sipariş Hareketi")
 
-    # Sipariş tarihine göre sıralama
-    if not st.session_state.siparisler_df.empty:
-        # Günlük ve haftalık analiz için 'Tarih' sütununu kullanıyoruz
-        siparisler_df = st.session_state.siparisler_df.copy()
-        siparisler_df['Tarih'] = pd.to_datetime(siparisler_df['Tarih'])
+# Sipariş tarihine göre sıralama ve analiz
+# Sipariş verilerinin günlük ve haftalık toplamlarının hesaplanması
+siparis_verileri = st.session_state['siparisler']  # Sipariş verilerini session'dan alıyoruz
 
-        # Günlük sipariş verisi
-        daily_sales = siparisler_df.groupby(siparisler_df['Tarih'].dt.date)['Miktar'].sum().reset_index()
-        daily_sales.columns = ['Tarih', 'Toplam Miktar']
+# Sipariş tarihi sütununu datetime formatına çeviriyoruz
+siparis_verileri['Sipariş Tarihi'] = pd.to_datetime(siparis_verileri['Sipariş Tarihi'])
 
-        # Haftalık sipariş verisi
-        weekly_sales = siparisler_df.groupby(siparisler_df['Tarih'].dt.to_period('W'))['Miktar'].sum().reset_index()
-        weekly_sales.columns = ['Tarih', 'Toplam Miktar']
+# Günlük sipariş hareketi
+gunluk_hareket = siparis_verileri.groupby(siparis_verileri['Sipariş Tarihi'].dt.date).size().reset_index(name='Sipariş Sayısı')
+gunluk_hareket['Sipariş Tarihi'] = pd.to_datetime(gunluk_hareket['Sipariş Tarihi'])  # Tarih sütununu datetime olarak belirtiyoruz
 
-        # Altair ile grafikler
-        daily_sales_chart = alt.Chart(daily_sales).mark_line().encode(
-            x='Tarih:T',
-            y='Toplam Miktar:Q',
-            color=alt.value('blue')
-        ).properties(title="Günlük Sipariş Hareketi")
+# Haftalık sipariş hareketi
+haftalik_hareket = siparis_verileri.resample('W-Mon', on='Sipariş Tarihi').size().reset_index(name='Sipariş Sayısı')
 
-        weekly_sales_chart = alt.Chart(weekly_sales).mark_line().encode(
-            x='Tarih:T',
-            y='Toplam Miktar:Q',
-            color=alt.value('orange')
-        ).properties(title="Haftalık Sipariş Hareketi")
+# Günlük sipariş hareketi grafiği
+st.write("Günlük Sipariş Hareketi")
+gunluk_grafik = alt.Chart(gunluk_hareket).mark_line(point=True).encode(
+    x=alt.X('Sipariş Tarihi:T', title='Tarih'),
+    y=alt.Y('Sipariş Sayısı:Q', title='Sipariş Sayısı')
+).properties(
+    width=600,
+    height=400,
+    title="Günlük Sipariş Hareketi"
+)
+st.altair_chart(gunluk_grafik)
 
-        st.altair_chart(daily_sales_chart, use_container_width=True)
-        st.altair_chart(weekly_sales_chart, use_container_width=True)
-    else:
-        st.warning("Henüz sipariş verisi bulunmamaktadır.")
+# Haftalık sipariş hareketi grafiği
+st.write("Haftalık Sipariş Hareketi")
+haftalik_grafik = alt.Chart(haftalik_hareket).mark_line(point=True, color='green').encode(
+    x=alt.X('Sipariş Tarihi:T', title='Tarih'),
+    y=alt.Y('Sipariş Sayısı:Q', title='Sipariş Sayısı')
+).properties(
+    width=600,
+    height=400,
+    title="Haftalık Sipariş Hareketi"
+)
+st.altair_chart(haftalik_grafik)
 
-    # Düşük Stok Uyarı Raporu
-    st.subheader("Düşük Stok Uyarıları")
-
-    # Düşük stok seviyesindeki ürünlerin raporlanması
-    eksik_stok_df = st.session_state.stok_df[st.session_state.stok_df['Stok Miktarı'] < st.session_state.stok_df['Yeniden Sipariş Sınırı']]
-    
-    if not eksik_stok_df.empty:
-        st.write("Düşük stok seviyesindeki ürünler:")
-        st.write(eksik_stok_df[['Ürün Kodu', 'Ürün Adı', 'Stok Miktarı', 'Yeniden Sipariş Sınırı']])
-    else:
-        st.success("Tüm ürünler yeterli stok seviyesinde.")
-
-    # Sipariş ve stok analizi
-    st.subheader("Ürün Bazlı Sipariş ve Stok Analizi")
-
-    if not st.session_state.stok_df.empty and not st.session_state.siparisler_df.empty:
-        # Ürün bazında stok ve sipariş bilgilerini birleştirme
-        stok_siparis_df = pd.merge(st.session_state.stok_df, st.session_state.siparisler_df.groupby('Ürün Kodu')['Miktar'].sum().reset_index(), on='Ürün Kodu', how='left')
-        stok_siparis_df['Miktar'] = stok_siparis_df['Miktar'].fillna(0)  # Eğer sipariş yoksa 0 olarak al
-
-        stok_siparis_df['Kalan Stok'] = stok_siparis_df['Stok Miktarı'] - stok_siparis_df['Miktar']
-
-        # Ürün bazında raporlama
-        st.write(stok_siparis_df[['Ürün Kodu', 'Ürün Adı', 'Stok Miktarı', 'Miktar', 'Kalan Stok']])
-
-        # Altair ile stok ve sipariş analizi grafiği
-        product_analysis_chart = alt.Chart(stok_siparis_df).mark_bar().encode(
-            x='Ürün Adı',
-            y='Stok Miktarı',
-            color='Ürün Kodu',
-            tooltip=['Ürün Adı', 'Stok Miktarı', 'Miktar', 'Kalan Stok']
-        ).properties(title="Ürün Bazlı Stok ve Sipariş Analizi")
-
-        st.altair_chart(product_analysis_chart, use_container_width=True)
-
-    else:
-        st.warning("Stok veya sipariş verisi eksik.")
+# Günlük ve haftalık hareketlerin analiz özeti
+st.write("Analiz Özeti:")
+st.write(f"Günlük sipariş ortalaması: {gunluk_hareket['Sipariş Sayısı'].mean():.2f}")
+st.write(f"Haftalık sipariş ortalaması: {haftalik_hareket['Sipariş Sayısı'].mean():.2f}")
+st.write(f"En yüksek günlük sipariş sayısı: {gunluk_hareket['Sipariş Sayısı'].max()} ({gunluk_hareket.loc[gunluk_hareket['Sipariş Sayısı'].idxmax(), 'Sipariş Tarihi']})")
+st.write(f"En yüksek haftalık sipariş sayısı: {haftalik_hareket['Sipariş Sayısı'].max()} ({haftalik_hareket.loc[haftalik_hareket['Sipariş Sayısı'].idxmax(), 'Sipariş Tarihi']})")
