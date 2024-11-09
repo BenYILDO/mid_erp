@@ -5,19 +5,19 @@ import pandas as pd
 if 'stok_df' not in st.session_state:
     st.session_state.stok_df = pd.DataFrame(columns=["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"])
 
+if 'siparisler_df' not in st.session_state:
+    st.session_state.siparisler_df = pd.DataFrame(columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar"])
+
 # Fonksiyonlar
 def stok_ekle(urun_kodu, urun_adi, miktar, yeniden_siparis_siniri):
-    # Mevcut ürün varsa miktarı güncelle
     if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values:
         st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'] += miktar
     else:
-        # Yeni ürün ekle
         yeni_veri = pd.DataFrame([[urun_kodu, urun_adi, miktar, yeniden_siparis_siniri]],
                                  columns=["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"])
         st.session_state.stok_df = pd.concat([st.session_state.stok_df, yeni_veri], ignore_index=True)
 
 def stok_guncelle(urun_kodu, siparis_miktari):
-    # Stoktan düş ve uyarı ver
     if urun_kodu in st.session_state.stok_df['Ürün Kodu'].values:
         mevcut_stok = st.session_state.stok_df.loc[st.session_state.stok_df['Ürün Kodu'] == urun_kodu, 'Stok Miktarı'].values[0]
         if mevcut_stok >= siparis_miktari:
@@ -28,22 +28,15 @@ def stok_guncelle(urun_kodu, siparis_miktari):
     else:
         return "Bu ürün stokta bulunmuyor."
 
-def dosya_yukle(uploaded_file):
-    try:
-        df = pd.read_excel(uploaded_file)
-        if all(col in df.columns for col in ["Ürün Kodu", "Ürün Adı", "Stok Miktarı", "Yeniden Sipariş Sınırı"]):
-            st.session_state.stok_df = pd.concat([st.session_state.stok_df, df], ignore_index=True).drop_duplicates(subset=['Ürün Kodu'], keep='last')
-            st.success("Dosya başarıyla yüklendi ve stok bilgileri güncellendi.")
-        else:
-            st.error("Excel dosyası gerekli sütunlara sahip değil: 'Ürün Kodu', 'Ürün Adı', 'Stok Miktarı', 'Yeniden Sipariş Sınırı'")
-    except Exception as e:
-        st.error(f"Hata: {e}")
+def siparis_ekle(siparis_adi, urun_kodu, urun_adi, miktar):
+    yeni_siparis = pd.DataFrame([[siparis_adi, urun_kodu, urun_adi, miktar]], columns=["Sipariş Adı", "Ürün Kodu", "Ürün Adı", "Miktar"])
+    st.session_state.siparisler_df = pd.concat([st.session_state.siparisler_df, yeni_siparis], ignore_index=True)
 
-# Uygulama başlığı
+# Uygulama Başlığı
 st.title("Gelişmiş ERP Stok ve Sipariş Yönetimi")
 
 # Sekmeler
-tab1, tab2, tab3 = st.tabs(["Stok Yönetimi", "Güncel Stok Durumu", "Sipariş Ekle"])
+tab1, tab2, tab3, tab4 = st.tabs(["Stok Yönetimi", "Güncel Stok Durumu", "Sipariş Ekle", "Siparişler Ekranı"])
 
 # Stok Yönetimi Sekmesi
 with tab1:
@@ -59,22 +52,6 @@ with tab1:
         if st.button("Stok Ekle"):
             stok_ekle(urun_kodu, urun_adi, miktar, yeniden_siparis_siniri)
             st.success(f"{urun_adi} ({urun_kodu}) başarıyla eklendi veya güncellendi.")
-
-    # Stok Güncelleme
-    with st.expander("Stok Güncelle"):
-        guncelle_urun_kodu = st.text_input("Güncelleme için Ürün Kodu")
-        siparis_miktari = st.number_input("Sipariş Miktarı", min_value=1)
-        
-        if st.button("Stok Güncelle"):
-            mesaj = stok_guncelle(guncelle_urun_kodu, siparis_miktari)
-            st.info(mesaj)
-
-    # Dosya Yükleme
-    with st.expander("Dosya Ekle"):
-        uploaded_file = st.file_uploader("Stok bilgilerini içeren bir Excel dosyası yükleyin", type=['xlsx'])
-        
-        if st.button("Dosya Yükle") and uploaded_file is not None:
-            dosya_yukle(uploaded_file)
 
 # Güncel Stok Durumu Sekmesi
 with tab2:
@@ -93,18 +70,42 @@ with tab2:
 with tab3:
     st.header("Sipariş Ekle")
 
-    # Çoklu ürün sipariş girişi
-    siparis_urun_kodu = st.text_input("Sipariş Ürün Kodu (virgülle ayırarak birden fazla ürün ekleyebilirsiniz)")
-    siparis_miktar = st.text_input("Sipariş Miktarları (ürün kodlarına göre virgülle ayırarak sırasıyla miktarları girin)")
-    
-    if st.button("Siparişi İşle"):
-        # Ürün kodları ve miktarları işleme
-        urun_kodlari = siparis_urun_kodu.split(',')
-        miktarlar = [int(m) for m in siparis_miktar.split(',')]
+    # Sipariş bilgileri girişi
+    siparis_adi = st.text_input("Sipariş Adı")
+    urun_kodu = st.text_input("Ürün Kodu (Virgülle ayırarak birden fazla ürün ekleyebilirsiniz)")
+    urun_adi = st.text_input("Ürün Adı (Virgülle ayırarak ürün adlarını girin)")
+    miktar = st.text_input("Miktar (Virgülle ayırarak sırasıyla miktarları girin)")
+
+    if st.button("Siparişi Kaydet"):
+        urun_kodlari = urun_kodu.split(',')
+        urun_adlari = urun_adi.split(',')
+        miktarlar = [int(m) for m in miktar.split(',')]
+
+        for k, a, m in zip(urun_kodlari, urun_adlari, miktarlar):
+            siparis_ekle(siparis_adi, k.strip(), a.strip(), m)
+            stok_guncelle(k.strip(), m)
         
-        # Sipariş işlemi ve stok güncelleme
-        for urun, miktar in zip(urun_kodlari, miktarlar):
-            mesaj = stok_guncelle(urun.strip(), miktar)
-            st.info(mesaj)
-        
-        st.success("Sipariş işlendi ve stoklar güncellendi.")
+        st.success("Sipariş eklendi ve stoklar güncellendi.")
+
+# Siparişler Ekranı Sekmesi
+with tab4:
+    st.header("Siparişler Ekranı")
+
+    # Tüm siparişler için liste
+    for siparis_adi in st.session_state.siparisler_df['Sipariş Adı'].unique():
+        with st.expander(f"Sipariş: {siparis_adi}"):
+            siparis_detay = st.session_state.siparisler_df[st.session_state.siparisler_df['Sipariş Adı'] == siparis_adi]
+            st.write(siparis_detay)
+
+            # Sipariş Düzenleme
+            urun_secimi = st.selectbox("Düzenlenecek Ürün", siparis_detay['Ürün Kodu'])
+            yeni_miktar = st.number_input("Yeni Miktar", min_value=0)
+            if st.button(f"{urun_secimi} Ürününü Güncelle"):
+                st.session_state.siparisler_df.loc[(st.session_state.siparisler_df['Sipariş Adı'] == siparis_adi) &
+                                                   (st.session_state.siparisler_df['Ürün Kodu'] == urun_secimi), 'Miktar'] = yeni_miktar
+                st.success(f"{urun_secimi} ürününün miktarı güncellendi.")
+                
+                # Stok miktarını da güncelle
+                mevcut_miktar = siparis_detay[siparis_detay['Ürün Kodu'] == urun_secimi]['Miktar'].values[0]
+                stok_guncelle(urun_secimi, mevcut_miktar - yeni_miktar)
+                st.info("Stok durumu güncellendi.")
